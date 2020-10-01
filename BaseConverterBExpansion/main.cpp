@@ -1,88 +1,162 @@
-#include<iostream>
-#include<string>
-#include<vector>
+#include <iostream>
+#include <string>
+#include <vector>
 
-double Value(std::vector<double>* result, double radix)
+namespace StringUtils
 {
-	//TODO: fix error when input = DBL_MAX
-	double res = 0;
-	for (long int i = 0; i < result->size(); i++)
-		res += result->at(i) * pow(radix, i);
+	std::vector<std::string>* Split(std::string str, std::string del)
+	{
+		std::vector<std::string>* ret = new std::vector<std::string>();
+		size_t pos = 0;
+		std::string token;
+		while ((pos = str.find(del)) != std::string::npos)
+		{
+			token = str.substr(0, pos);
+			ret->push_back(token);
+			str.erase(0, pos + del.length());
+		}
 
-	return res;
+		ret->push_back(str);
+
+		return ret;
+	}
+
+	void Reverse(std::string& str)
+	{
+		int len = str.length();
+		int n = len - 1;
+		for (int i = 0;i < (len / 2);i++)
+		{
+			std::swap(str[i], str[n]);
+			n = n - 1;
+		}
+	}
+
+	std::string ReplaceAll(std::string str, const std::string& from, const std::string& to)
+	{
+		size_t start_pos = 0;
+		while ((start_pos = str.find(from, start_pos)) != std::string::npos)
+		{
+			str.replace(start_pos, from.length(), to);
+			start_pos += to.length();
+		}
+		return str;
+	}
 }
 
-double Value(std::vector<double>* before, std::vector<double>* after, double radix)
+double ToBase10(std::string number, double fromBase)
 {
-	double res = Value(before, radix);
-	for (long int i = 0; i < after->size(); i++)
-		res += after->at(i) * pow(radix, -i - 1);
+	std::vector<std::string>* parts = StringUtils::Split(number, ".");
+	std::string intPart = parts->at(0);
+	StringUtils::Reverse(intPart);
 
-	return res;
+	std::string decPart = "";
+	if (parts->size() > 1)
+		decPart = parts->at(1);
+
+	double n = 0;
+	unsigned int part = (unsigned int)log10(fromBase - 1) + 1;
+	for (unsigned int i = 0; i < intPart.length(); i += part)
+	{
+		std::string current = intPart.substr(i, part);
+		StringUtils::Reverse(current);
+		n += std::stof(current) * pow(fromBase, (float)(i / part));
+	}
+	
+	for (unsigned int i = 0; i < decPart.length(); i++)
+		n += (decPart[i] - '0') * pow(fromBase, -((float)i + 1));
+
+	return n;
 }
 
-void Invert(std::vector<double>* before, std::vector<double>* after)
+std::string ToBase(double number, double toBase)
 {
-	std::reverse(before->begin(), before->end());
-	std::reverse(after->begin(), after->end());
-	before->swap(*after);
-	before->push_back(after->at(after->size() - 1));
-	after->resize(after->size() - 1);
+	std::string result = "";
+	unsigned int part = (unsigned int)log10(toBase - 1) + 1;
+	int exp = log10(number) / log10(toBase);
+	for (; number > DBL_EPSILON; exp--)
+	{
+		unsigned int digit = number / pow(toBase, exp);
+		number = number - digit * pow(toBase, exp);
+
+		std::string comp = std::to_string(digit);
+		comp.insert(comp.begin(), part - comp.length(), '0');
+		result += comp;
+
+		if (exp == 0)
+			result += ".";
+	}
+
+	if (number < DBL_EPSILON && exp != 0)
+	{
+		std::string pad = "";
+		pad.insert(pad.begin(), exp + 1, '0');
+		result += pad;
+	}
+
+	return result;
 }
 
-void Print(std::vector<double>* before, std::vector<double>* after, bool invert)
+std::string Convert(std::string number, double fromBase, double toBase, bool useChar = false)
 {
-	for (long int i = before->size() - 1; i > -1; i--)
-		std::cout << before->at(i) << std::endl;
-	std::cout << "............................" << std::endl;
-	for (long int i = after->size() - 1; i > -1; i--)
-		std::cout << after->at(i) << std::endl;
+	std::string newNumber = number;
+	if (useChar)
+	{
+		newNumber = "";
+		unsigned int part = (unsigned int)log10(fromBase - 1) + 1;
+		for (unsigned int i = 0; i < number.length(); i++)
+		{
+			std::string comp = "";
+			if (number[i] - '0' >= 0 && number[i] - '0' <= 9)
+			{
+				comp = number[i];
+				comp.insert(comp.begin(), part - comp.length(), '0');
+				newNumber += comp;
+			}
+			else if (number[i] - '0' > 16)
+			{
+				comp = std::to_string(number[i] - '7');
+				newNumber += comp;
+			}
+		}
+	}
+
+	double base10Number = ToBase10(newNumber, fromBase);
+	std::string result = ToBase(base10Number, toBase);
+
+	std::string newResult = result;
+	if (useChar)
+	{
+		newResult = "";
+		unsigned int part = (unsigned int)log10(fromBase - 1) + 1;
+		for (unsigned int i = 0; i < result.length() - 1; i += part)
+		{
+			std::string substr = result.substr(i, part);
+			unsigned int digit = std::stoi(substr);
+			char ch;
+			if (digit >= 10)
+				ch = (char)(digit + '7');
+			else
+				ch = (char)(digit + '0');
+			newResult += ch;
+		}
+	}
+
+	return newResult;
 }
 
 int main()
 {
-	double input = DBL_MAX;
-	const double constInput = input;
-	double radix = 0.0001;
+	std::cout << "Base converter from any base to any base" << std::endl;
+	std::cout << "To avoid problem with base > 16, instead of using A for 10, B for 11, and so on," << std::endl;
+	std::cout << "use extended values 10, 11, ... . For example the number AB5D (base 16) become 10110513." << std::endl;
 
-	bool invert = false;
-	if (radix < 1)
-	{
-		radix = 1 / radix;
-		invert = true;
-	}
-
-	std::vector<double>* before = new std::vector<double>;
-	while (input != 0)
-	{
-		double q = round(input / radix);
-		double res = input - q * radix;
-		before->push_back(res);
-		input = (double)q;
-	}
-
-	double diff = constInput - Value(before, radix);
-
-	int index = -1;
-	std::vector<double>* after = new std::vector<double>;
-	while (diff != 0)
-	{
-		double q = round(diff / pow(radix, index));
-		after->push_back(q);
-		diff = diff - q * pow(radix, index);
-		index--;
-	}
-
-	diff = constInput - Value(before, after, radix);
-	if (diff == 0)
-	{
-		if (invert)
-			Invert(before, after);
-		Print(before, after, invert);
-	}
+	std::string start = "ABC";
+	std::string result = Convert(start, 16, 17, true);
+	std::cout << result << std::endl;
+	result = Convert(result, 17, 16, true);
+	std::cout << result << std::endl;
 
 	int a;
 	std::cin >> a;
-
-	return 0;
 }
